@@ -9,6 +9,7 @@ A generic driver for the MAX31865 RTD to Digital converter
 - [x] reading the raw value and the converted temperature value
 - [x] setting the ohmic reference resistor
 - [x] configuring V_BIAS, one shot, filter frequency
+- [ ] Feature parity with [python](https://github.com/adafruit/Adafruit_CircuitPython_MAX31865) and [c++](https://github.com/adafruit/Adafruit_MAX31865) reference versions
 - [ ] Fault tolerance / detection / status
 - [ ] Ensure temperature conversion table handles out of bounds values using interpolation (less than 0°C or more than 130°C)
 - [ ] Non Raspberry Pi example (as input pins aren't handled correctly)
