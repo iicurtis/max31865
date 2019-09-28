@@ -34,7 +34,7 @@ pub struct Max31865<SPI, NCS> {
 impl<E, SPI, NCS> Max31865<SPI, NCS>
 where
     SPI: spi::Write<u8, Error = E> + spi::Transfer<u8, Error = E>,
-    NCS: OutputPin<Error = E>,
+    NCS: OutputPin,
 {
     /// Create a new MAX31865 module.
     ///
@@ -47,7 +47,7 @@ where
     pub fn new(spi: SPI, mut ncs: NCS) -> Result<Max31865<SPI, NCS>, E> {
         let default_calib = 43000;
 
-        ncs.set_high()?;
+        ncs.set_high();
         let max31865 = Max31865 {
             spi,
             ncs,
@@ -139,9 +139,9 @@ where
         let mut buffer = [0; 3];
         buffer[0] = reg.read_address();
         {
-            self.ncs.set_low()?;
+            self.ncs.set_low();
             self.spi.transfer(&mut buffer)?;
-            self.ncs.set_high()?;
+            self.ncs.set_high();
         }
         let r: u16 = (u16::from(buffer[1]) << 8) | u16::from(buffer[2]);
 
@@ -152,9 +152,9 @@ where
         let mut buffer = [0xFF; 4];
         buffer[0] = reg.read_address();
         {
-            self.ncs.set_low()?;
+            self.ncs.set_low();
             self.spi.transfer(&mut buffer)?;
-            self.ncs.set_high()?;
+            self.ncs.set_high();
         }
         let r: u8 = buffer[1];
 
@@ -172,9 +172,9 @@ where
     // Ok(self.rdy.is_low()?)
     // }
     fn write(&mut self, reg: Register, val: u8) -> Result<(), E> {
-        self.ncs.set_low()?;
+        self.ncs.set_low();
         self.spi.write(&[reg.write_address(), val])?;
-        self.ncs.set_high()?;
+        self.ncs.set_high();
         Ok(())
     }
 }
