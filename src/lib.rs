@@ -25,16 +25,17 @@ pub enum SensorWires {
     ThreeWire = 1,
 }
 
-pub struct Max31865<SPI, NCS> {
+#[derive(Debug)]
+pub struct Max31865<SPI: spi::Write<u8>, NCS: OutputPin> {
     spi: SPI,
     ncs: NCS,
     ref_resistor: u32,
 }
 
-impl<E, SPI, NCS> Max31865<SPI, NCS>
+impl<SPI, NCS, SPIErr, CSErr> Max31865<SPI, NCS>
 where
-    SPI: spi::Write<u8, Error = E> + spi::Transfer<u8, Error = E>,
-    NCS: OutputPin,
+    SPI: spi::Write<u8, Error = SPIErr> + spi::Transfer<u8, Error = SPIErr>,
+    NCS: OutputPin<Error=CSErr>,
 {
     /// Create a new MAX31865 module.
     ///
@@ -44,10 +45,11 @@ where
     /// * `ncs` - The chip select pin which should be set to a push pull output pin.
     /// * `wires` - The number of wires: 2, 3, 4 to enable the correct mode
     ///
-    pub fn new(spi: SPI, mut ncs: NCS) -> Result<Max31865<SPI, NCS>, E> {
+
+    pub fn new(spi: SPI, mut ncs: NCS) -> Result<Max31865<SPI, NCS>, MxErr<SPIErr, CSErr>> {
         let default_calib = 43000;
 
-        ncs.set_high();
+        ncs.set_high().map_err(MxErr::CS)?;
         let max31865 = Max31865 {
             spi,
             ncs,
@@ -80,7 +82,7 @@ where
         one_shot: bool,
         sensor_wires: SensorWires,
         filter_mode: FilterMode,
-    ) -> Result<(), E> {
+    ) -> Result<(), MxErr<SPIErr, CSErr>> {
         let conf: u8 = ((vbias as u8) << 7)
             | ((conversion_mode as u8) << 6)
             | ((one_shot as u8) << 5)
@@ -106,7 +108,7 @@ where
     /// You can perform calibration by putting the sensor in boiling (100 degrees
     /// Celcius) water and then measuring the raw value using `read_raw`. Calculate
     /// `calib` as `(13851 << 15) / raw >> 1`.
-    pub fn set_calibration(&mut self, calib: u32) -> Result<(), E> {
+    pub fn set_calibration(&mut self, calib: u32) -> Result<(), MxErr<SPIErr, CSErr>> {
         self.ref_resistor = calib;
         Ok(())
     }
@@ -116,7 +118,7 @@ where
     /// # Remarks
     ///
     /// The output value is the value in degrees Celcius multiplied by 100.
-    pub fn read_default_conversion(&mut self) -> Result<u32, E> {
+    pub fn read_default_conversion(&mut self) -> Result<u32, MxErr<SPIErr, CSErr>> {
         let raw = self.read_16(Register::RTD_MSB)?;
         let ohms = (u32::from(raw >> 1) * self.ref_resistor) >> 15;
         let temp = temp_conversion::lookup_temperature(ohms as u16);
@@ -135,26 +137,26 @@ where
     /// The last bit specifies if the conversion was successful.
     /// https://datasheets.maximintegrated.com/en/ds/MAX31865.pdf
     /// http://www.analog.com/media/en/technical-documentation/application-notes/AN709_0.pdf
-    fn read_16(&mut self, reg: Register) -> Result<u16, E> {
+    fn read_16(&mut self, reg: Register) -> Result<u16, MxErr<SPIErr, CSErr>> {
         let mut buffer = [0; 3];
         buffer[0] = reg.read_address();
         {
-            self.ncs.set_low();
-            self.spi.transfer(&mut buffer)?;
-            self.ncs.set_high();
+            self.ncs.set_low().map_err(MxErr::CS)?;
+            self.spi.transfer(&mut buffer).map_err(MxErr::SPI)?;
+            self.ncs.set_high().map_err(MxErr::CS)?;
         }
         let r: u16 = (u16::from(buffer[1]) << 8) | u16::from(buffer[2]);
 
         Ok(r)
     }
 
-    fn read_8(&mut self, reg: Register) -> Result<u8, E> {
+    fn read_8(&mut self, reg: Register) -> Result<u8, MxErr<SPIErr, CSErr>> {
         let mut buffer = [0xFF; 4];
         buffer[0] = reg.read_address();
         {
-            self.ncs.set_low();
-            self.spi.transfer(&mut buffer)?;
-            self.ncs.set_high();
+            self.ncs.set_low().map_err(MxErr::CS)?;
+            self.spi.transfer(&mut buffer).map_err(MxErr::SPI)?;
+            self.ncs.set_high().map_err(MxErr::CS)?;
         }
         let r: u8 = buffer[1];
 
@@ -171,12 +173,18 @@ where
     // pub fn is_ready(&self) -> Result<bool, E> {
     // Ok(self.rdy.is_low()?)
     // }
-    fn write(&mut self, reg: Register, val: u8) -> Result<(), E> {
-        self.ncs.set_low();
-        self.spi.write(&[reg.write_address(), val])?;
-        self.ncs.set_high();
+    fn write(&mut self, reg: Register, val: u8) -> Result<(), MxErr<SPIErr, CSErr>> {
+        self.ncs.set_low().map_err(MxErr::CS)?;
+        self.spi.write(&[reg.write_address(), val]).map_err(MxErr::SPI)?;
+        self.ncs.set_high().map_err(MxErr::CS)?;
         Ok(())
     }
+}
+
+#[derive(Debug)]
+pub enum MxErr<SPIErr, CSErr> {
+    SPI(SPIErr),
+    CS(CSErr),
 }
 
 #[allow(non_camel_case_types)]
