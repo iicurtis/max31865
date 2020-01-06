@@ -35,7 +35,7 @@ pub struct Max31865<SPI: spi::Write<u8>, NCS: OutputPin> {
 impl<SPI, NCS, SPIErr, CSErr> Max31865<SPI, NCS>
 where
     SPI: spi::Write<u8, Error = SPIErr> + spi::Transfer<u8, Error = SPIErr>,
-    NCS: OutputPin<Error=CSErr>,
+    NCS: OutputPin<Error = CSErr>,
 {
     /// Create a new MAX31865 module.
     ///
@@ -175,7 +175,9 @@ where
     // }
     fn write(&mut self, reg: Register, val: u8) -> Result<(), MxErr<SPIErr, CSErr>> {
         self.ncs.set_low().map_err(MxErr::CS)?;
-        self.spi.write(&[reg.write_address(), val]).map_err(MxErr::SPI)?;
+        self.spi
+            .write(&[reg.write_address(), val])
+            .map_err(MxErr::SPI)?;
         self.ncs.set_high().map_err(MxErr::CS)?;
         Ok(())
     }
